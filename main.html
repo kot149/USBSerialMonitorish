@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>USB シリアルモニター</title>
 </head>
+
 <body>
     <h1>USB シリアルモニター</h1>
     <button onclick="connectSerial()">接続</button>
@@ -24,9 +26,11 @@
                     outputElement.textContent += new TextDecoder().decode(value) + "\n";
                 }
             } catch (error) {
-                console.error("Serial connection error:", error);
+                console.error("エラー発生:", error);
+                alert("シリアル接続に失敗しました：" + error.message);
             }
         }
     </script>
 </body>
+
 </html>
