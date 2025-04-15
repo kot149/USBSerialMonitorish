@@ -1,18 +1,32 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
-    <title>USB Serial Port Info</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USB シリアルモニター</title>
 </head>
-
 <body>
-    <h1>USB Serial Port Information</h1> <button id="connectButton">Connect</button> <input type="text" id="filterInput"
-        placeholder="Enter regex filter">
-    <div id="output"></div>
-    <h2>Key Press Information</h2>
-    <div id="keyInfo"></div>
-    <script src="script.js"></script>
-</body>
+    <h1>USB シリアルモニター</h1>
+    <button onclick="connectSerial()">接続</button>
+    <pre id="output"></pre>
 
+    <script>
+        async function connectSerial() {
+            try {
+                const port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                const reader = port.readable.getReader();
+                const outputElement = document.getElementById("output");
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    outputElement.textContent += new TextDecoder().decode(value) + "\n";
+                }
+            } catch (error) {
+                console.error("Serial connection error:", error);
+            }
+        }
+    </script>
+</body>
 </html>
