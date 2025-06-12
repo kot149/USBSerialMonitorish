@@ -1,0 +1,194 @@
+import React, { useState, useEffect, createContext, useContext } from 'react'
+
+// 1. Contextを作成
+const SerialPortContext = createContext(null)
+
+// 2. Providerコンポーネントを作成し、すべてのロジックをここに移動
+export function SerialPortProvider({ children }) {
+  const [ports, setPorts] = useState([])
+  const [selectedPort, setSelectedPort] = useState(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const [error, setError] = useState(null)
+  const [baudRate, setBaudRate] = useState(9600)
+  const [reader, setReader] = useState(null)
+  const [output, setOutput] = useState([])
+
+  const listPorts = async () => {
+    if (!('serial' in navigator)) {
+      setError('Web Serial API is not supported in this browser')
+      return
+    }
+
+    try {
+      const availablePorts = await navigator.serial.getPorts()
+      setPorts(availablePorts.filter(port => {
+        const info = port.getInfo()
+        return !info.usbVendorId || (info.usbVendorId && !info.bluetoothServiceClassId)
+      }))
+    } catch (err) {
+      setError('Failed to list serial ports')
+      console.error('Failed to get ports:', err)
+    }
+  }
+
+  const requestPort = async () => {
+    setError(null)
+    if (!('serial' in navigator)) {
+      setError('Web Serial API is not supported')
+      return
+    }
+
+    try {
+      const port = await navigator.serial.requestPort()
+      setPorts(prev => [...prev.filter(p => p !== port), port])
+      setSelectedPort(port)
+    } catch (err) {
+      if (err.name === 'NotFoundError') {
+        setError('No compatible serial port selected')
+      } else {
+        setError('Failed to access serial port')
+      }
+      console.error('Failed to request port:', err)
+    }
+  }
+
+  const connect = async (selectedBaudRate) => {
+    if (!selectedPort) {
+      setError('No port selected')
+      return
+    }
+
+    try {
+      await selectedPort.open({ baudRate: parseInt(selectedBaudRate) || 9600 })
+      setBaudRate(selectedBaudRate)
+      setIsConnected(true)
+      setError(null)
+
+      const textDecoder = new TextDecoderStream()
+      selectedPort.readable.pipeTo(textDecoder.writable)
+      const reader = textDecoder.readable.getReader()
+      setReader(reader)
+    } catch (err) {
+      setError(`Failed to connect: ${err.message}`)
+      console.error('Connection error:', err)
+    }
+  }
+    useEffect(() => {
+    if (!reader) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const readLoop = async () => {
+      try {
+        while (!isCancelled) {
+          const { value, done } = await reader.read();
+          if (done) {
+            break;
+          }
+          if (value) {
+            // TextDecoderStreamは文字列チャンクを直接返すので、
+            // それをそのまま出力配列に追加します。
+            setOutput((prev) => [...prev, value]);
+          }
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          console.error("Read error:", err);
+          setError("Failed to read from port. It may have been disconnected.");
+          disconnect(); // エラー時に切断処理を呼ぶ
+        }
+      }
+    };
+
+    readLoop();
+
+    return () => {
+      isCancelled = true;
+      if (reader) {
+        reader.cancel().catch(e => console.error("Failed to cancel reader on cleanup", e));
+      }
+    };
+  }, [reader]);
+
+
+  const disconnect = async () => {
+    if (reader) {
+      try {
+        await reader.cancel()
+      } catch (err) {
+        console.warn('Error canceling reader:', err)
+      } finally {
+        setReader(null)
+      }
+    }
+    
+    if (selectedPort?.readable) {
+      try {
+        // readableストリームがロックされている場合があるので、先にリーダーをキャンセルします
+        // readable.cancel()は存在しないため、reader.cancel()を使用します。
+        // ポートを閉じる処理
+        await selectedPort.close()
+      } catch (err) {
+        console.warn('Error closing port:', err)
+      }
+    }
+    
+    setIsConnected(false)
+    setError(null)
+  }
+
+  const clearOutput = () => {
+    setOutput([])
+  }
+
+  useEffect(() => {
+    listPorts()
+    
+    const handleConnect = (e) => {
+      console.log('port connected', e.port)
+      listPorts()
+    }
+    const handleDisconnect = (e) => {
+      console.log('port disconnected', e.port)
+      if(selectedPort === e.port) {
+        disconnect()
+      }
+      listPorts()
+    }
+
+    navigator.serial.addEventListener('connect', handleConnect)
+    navigator.serial.addEventListener('disconnect', handleDisconnect)
+
+    return () => {
+      navigator.serial.removeEventListener('connect', handleConnect)
+      navigator.serial.removeEventListener('disconnect', handleDisconnect)
+    }
+  }, [selectedPort])
+
+  const value = {
+    ports,
+    selectedPort,
+    isConnected,
+    error,
+    requestPort,
+    connect,
+    disconnect,
+    baudRate,
+    output,
+    clearOutput,
+    selectPort: setSelectedPort,
+  }
+
+  return <SerialPortContext.Provider value={value}>{children}</SerialPortContext.Provider>
+}
+
+// 3. Contextを使用するためのカスタムフック
+export const useSerialPort = () => {
+  const context = useContext(SerialPortContext)
+  if (!context) {
+    throw new Error('useSerialPort must be used within a SerialPortProvider')
+  }
+  return context
+}

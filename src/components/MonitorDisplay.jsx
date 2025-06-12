@@ -2,21 +2,19 @@ import React, { useRef, useEffect } from 'react'
 import { useSerialPort } from '../hooks/useSerialPort'
 
 export function MonitorDisplay() {
-  const { output, clearOutput, isConnected } = useSerialPort()
-  const monitorRef = useRef(null)
+  const { output, clearOutput } = useSerialPort();
+  const monitorRef = useRef(null);
 
   useEffect(() => {
-    console.log('Output updated:', output) // デバッグログ
     if (monitorRef.current) {
-      monitorRef.current.scrollTop = monitorRef.current.scrollHeight
+      monitorRef.current.scrollTop = monitorRef.current.scrollHeight;
     }
-  }, [output])
+  }, [output]);
 
+  // outputは文字列の配列なので、単純に結合して表示
   const displayText = output.length === 0 
     ? 'Waiting for data...' 
-    : output.map((text, i) => (
-        <span key={i} className="monitor-line">{text}</span>
-      ))
+    : output.join('');
 
   return (
     <div className="monitor-display">
@@ -32,5 +30,5 @@ export function MonitorDisplay() {
         </pre>
       </div>
     </div>
-  )
+  );
 }
