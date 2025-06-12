@@ -1,9 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react'
 
-// 1. Contextの作成
 const SerialPortContext = createContext(null)
 
-// 2. Providerコンポーネントの作成とロジックの集約
 export function SerialPortProvider({ children }) {
   const [ports, setPorts] = useState([])
   const [selectedPort, setSelectedPort] = useState(null)
@@ -12,14 +10,14 @@ export function SerialPortProvider({ children }) {
   const [baudRate, setBaudRate] = useState(9600)
   const [reader, setReader] = useState(null)
   const [output, setOutput] = useState([])
-  const [filter, setFilter] = useState('') // フィルタ用のstate
+  const [filter, setFilter] = useState('')
+  const [maxLogLines, setMaxLogLines] = useState(1000)
 
   const listPorts = async () => {
     if (!('serial' in navigator)) {
       setError('Web Serial API is not supported in this browser')
       return
     }
-
     try {
       const availablePorts = await navigator.serial.getPorts()
       setPorts(availablePorts.filter(port => {
@@ -38,7 +36,6 @@ export function SerialPortProvider({ children }) {
       setError('Web Serial API is not supported')
       return
     }
-
     try {
       const port = await navigator.serial.requestPort()
       setPorts(prev => [...prev.filter(p => p !== port), port])
@@ -58,13 +55,11 @@ export function SerialPortProvider({ children }) {
       setError('No port selected')
       return
     }
-
     try {
       await selectedPort.open({ baudRate: parseInt(selectedBaudRate) || 9600 })
       setBaudRate(selectedBaudRate)
       setIsConnected(true)
       setError(null)
-
       const textDecoder = new TextDecoderStream()
       selectedPort.readable.pipeTo(textDecoder.writable)
       const reader = textDecoder.readable.getReader()
@@ -83,7 +78,6 @@ export function SerialPortProvider({ children }) {
     let isCancelled = false;
     let buffer = '';
 
-    // ANSIエスケープシーケンスを削除するための正規表現
     const stripAnsi = (str) => {
       // eslint-disable-next-line no-control-regex
       const ansiRegex = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
@@ -100,15 +94,27 @@ export function SerialPortProvider({ children }) {
 
           buffer += value;
 
+          // ★ 新しい行をまとめて処理するロジックに変更
+          const newLines = [];
           let newlineIndex;
           while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
             const line = buffer.slice(0, newlineIndex + 1);
             buffer = buffer.slice(newlineIndex + 1);
-            
-            // 制御文字を削除してからstateを更新
             const cleanedLine = stripAnsi(line);
-            setOutput((prev) => [...prev, cleanedLine]);
+            newLines.push(cleanedLine);
           }
+
+          if (newLines.length > 0) {
+            setOutput((prev) => {
+              const combined = [...prev, ...newLines];
+              if (combined.length > maxLogLines) {
+                // 配列の末尾からmaxLogLines個の要素をスライスして返す
+                return combined.slice(combined.length - maxLogLines);
+              }
+              return combined;
+            });
+          }
+
         } catch (err) {
           if (!isCancelled) {
             setError("Failed to read from port.");
@@ -124,15 +130,20 @@ export function SerialPortProvider({ children }) {
     return () => {
       isCancelled = true;
       if (buffer.length > 0) {
-        // クリーンアップ時も同様に制御文字を削除
         const cleanedBuffer = stripAnsi(buffer);
-        setOutput((prev) => [...prev, cleanedBuffer]);
+        setOutput((prev) => {
+          const newOutput = [...prev, cleanedBuffer];
+           if (newOutput.length > maxLogLines) {
+            return newOutput.slice(newOutput.length - maxLogLines);
+          }
+          return newOutput;
+        });
       }
       if (reader) {
         reader.cancel().catch(e => console.error("Failed to cancel reader on cleanup", e));
       }
     };
-  }, [reader]);
+  }, [reader, maxLogLines]); // 依存配列にmaxLogLinesを追加
 
   const disconnect = async () => {
     if (reader) {
@@ -157,7 +168,6 @@ export function SerialPortProvider({ children }) {
     setError(null);
   }
 
-
   const clearOutput = () => {
     setOutput([])
   }
@@ -166,11 +176,9 @@ export function SerialPortProvider({ children }) {
     listPorts()
     
     const handleConnect = (e) => {
-      console.log('port connected', e.port)
       listPorts()
     }
     const handleDisconnect = (e) => {
-      console.log('port disconnected', e.port)
       if(selectedPort === e.port) {
         disconnect()
       }
@@ -200,12 +208,13 @@ export function SerialPortProvider({ children }) {
     selectPort: setSelectedPort,
     filter,
     setFilter,
+    maxLogLines,
+    setMaxLogLines,
   }
 
   return <SerialPortContext.Provider value={value}>{children}</SerialPortContext.Provider>
 }
 
-// 3. Contextを使用するためのカスタムフック
 export const useSerialPort = () => {
   const context = useContext(SerialPortContext)
   if (!context) {
