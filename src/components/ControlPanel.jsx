@@ -12,7 +12,9 @@ export function ControlPanel() {
     selectPort, 
     selectedPort,
     filter,
-    setFilter 
+    setFilter,
+    maxLogLines,      // ★追加
+    setMaxLogLines    // ★追加
   } = useSerialPort()
   
   const [selectedBaudRate, setSelectedBaudRate] = React.useState('9600')
@@ -108,6 +110,25 @@ export function ControlPanel() {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               disabled={!isConnected}
+              style={{
+                backgroundColor: '#1a1a1a',
+                color: '#fff',
+                border: '1px solid #333',
+                padding: '0.5rem',
+                borderRadius: '4px',
+                width: '100%',
+                marginTop: '0.5rem'
+              }}
+            />
+        </label>
+        {/* ★ ログ行数制限の入力フィールドを追加 */}
+        <label style={{ marginTop: '1rem' }}> 
+            Log limit (lines)
+            <input
+              type="number"
+              value={maxLogLines}
+              onChange={(e) => setMaxLogLines(Number(e.target.value))}
+              min="1"
               style={{
                 backgroundColor: '#1a1a1a',
                 color: '#fff',
