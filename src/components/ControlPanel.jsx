@@ -2,7 +2,19 @@ import React from 'react'
 import { useSerialPort } from '../hooks/useSerialPort'
 
 export function ControlPanel() {
-  const { ports, requestPort, isConnected, error, connect, disconnect, selectPort, selectedPort } = useSerialPort()
+  const { 
+    ports, 
+    requestPort, 
+    isConnected, 
+    error, 
+    connect, 
+    disconnect, 
+    selectPort, 
+    selectedPort,
+    filter,
+    setFilter 
+  } = useSerialPort()
+  
   const [selectedBaudRate, setSelectedBaudRate] = React.useState('9600')
 
   const handleConnectionToggle = async () => {
@@ -18,8 +30,10 @@ export function ControlPanel() {
   }
 
   const handlePortChange = (event) => {
-    const portIndex = parseInt(event.target.value)
-    selectPort(ports[portIndex])
+    const portIndex = parseInt(event.target.value, 10)
+    if (!isNaN(portIndex) && ports[portIndex]) {
+        selectPort(ports[portIndex])
+    }
   }
 
   return (
@@ -32,17 +46,20 @@ export function ControlPanel() {
             <div className="port-select-group">
               <select 
                 onChange={handlePortChange}
-                value={ports.indexOf(selectedPort)}
+                value={selectedPort ? ports.indexOf(selectedPort) : -1}
                 disabled={isConnected}
               >
                 <option value={-1}>Select a port...</option>
-                {ports.map((port, index) => (
-                  <option key={index} value={index}>
-                    {port.getInfo().usbVendorId ?
-                      `USB Device (VID:${port.getInfo().usbVendorId.toString(16)})` :
-                      `Port ${index + 1}`}
-                  </option>
-                ))}
+                {ports.map((port, index) => {
+                  const info = port.getInfo();
+                  return (
+                    <option key={index} value={index}>
+                      {info.usbVendorId ?
+                        `USB Device (VID: ${info.usbVendorId.toString(16)})` :
+                        `Port ${index + 1}`}
+                    </option>
+                  )
+                })}
               </select>
               <button 
                 onClick={requestPort} 
@@ -53,7 +70,6 @@ export function ControlPanel() {
               </button>
             </div>
           </label>
-          {error && <div className="error-message">{error}</div>}
         </div>
 
         <label>
@@ -77,10 +93,35 @@ export function ControlPanel() {
         <button 
           className={`connect-btn ${isConnected ? 'connected' : ''}`}
           onClick={handleConnectionToggle}
+          disabled={!selectedPort}
         >
           {isConnected ? 'Disconnect' : 'Connect'}
         </button>
       </div>
+
+      <div className="settings-group" style={{ marginTop: '1.5rem' }}>
+        <label>
+            Filter (Regex)
+            <input
+              type="text"
+              placeholder="e.g., ^ERROR"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              disabled={!isConnected}
+              style={{
+                backgroundColor: '#1a1a1a',
+                color: '#fff',
+                border: '1px solid #333',
+                padding: '0.5rem',
+                borderRadius: '4px',
+                width: '100%',
+                marginTop: '0.5rem'
+              }}
+            />
+        </label>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
     </div>
   )
 }

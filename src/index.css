@@ -144,3 +144,21 @@ select:disabled {
   background-color: #333;
   padding: 0.5rem 1rem;
 }
+
+.control-group {
+  margin-bottom: 1rem;
+}
+
+.filter-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #222;
+  color: #eee;
+}
+
+.filter-input:disabled {
+  background-color: #333;
+  cursor: not-allowed;
+}
