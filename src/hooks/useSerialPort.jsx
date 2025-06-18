@@ -105,7 +105,6 @@ export function SerialPortProvider({ children }) {
 
           buffer += value;
 
-          // ★ 新しい行をまとめて処理するロジックに変更
           const newLines = [];
           let newlineIndex;
           while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
@@ -119,7 +118,6 @@ export function SerialPortProvider({ children }) {
             setOutput((prev) => {
               const combined = [...prev, ...newLines];
               if (combined.length > maxLogLines) {
-                // 配列の末尾からmaxLogLines個の要素をスライスして返す
                 return combined.slice(combined.length - maxLogLines);
               }
               return combined;
@@ -128,7 +126,6 @@ export function SerialPortProvider({ children }) {
 
         } catch (err) {
           if (!isCancelled) {
-            // Only log non-device-lost errors
             if (!err.message.includes('device has been lost')) {
               console.error("Read error:", err);
             }
@@ -181,7 +178,7 @@ export function SerialPortProvider({ children }) {
         });
       }
     };
-  }, [reader, maxLogLines]); // 依存配列にmaxLogLinesを追加
+  }, [reader, maxLogLines]);
 
   const disconnect = async () => {
     setIsConnected(false);
@@ -196,7 +193,6 @@ export function SerialPortProvider({ children }) {
         }
     }
     
-    // 少し待ってからポートを閉じる
     await new Promise(resolve => setTimeout(resolve, 100));
     
     if (selectedPort) {
