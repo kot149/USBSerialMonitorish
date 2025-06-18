@@ -28,9 +28,34 @@ export function MonitorDisplay() {
     }
   }, [filteredOutput]);
 
-  // 表示するテキストを作成
-  const displayText = filteredOutput.length > 0
-    ? filteredOutput.join('') // 配列の各行を結合
+  // ハイライト機能を追加したテキスト作成
+  const renderHighlightedText = (text, searchPattern) => {
+    if (!searchPattern) {
+      return text;
+    }
+
+    try {
+      const regex = new RegExp(`(${searchPattern})`, 'gi');
+      const parts = text.split(regex);
+
+      return parts.map((part, index) => {
+        if (regex.test(part)) {
+          return <mark key={index}>{part}</mark>;
+        }
+        return part;
+      });
+    } catch (e) {
+      return text;
+    }
+  };
+
+  // 表示するコンテンツを作成
+  const displayContent = filteredOutput.length > 0
+    ? filteredOutput.map((line, lineIndex) => (
+        <span key={lineIndex}>
+          {renderHighlightedText(line, filter)}
+        </span>
+      ))
     : (output.length > 0 && filter ? 'No matching logs.' : 'Waiting for data...');
 
   return (
@@ -43,7 +68,7 @@ export function MonitorDisplay() {
       </div>
       <div className="monitor-content" ref={monitorRef}>
         <pre className="monitor-text">
-          {displayText}
+          {displayContent}
         </pre>
       </div>
     </div>
