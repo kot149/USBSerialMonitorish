@@ -93,31 +93,18 @@ export function ControlPanel() {
         </label>
 
         <button 
-          className={`connect-btn ${isConnected ? 'connected' : ''} ${isReconnecting ? 'reconnecting' : ''}`}
+          className={`connect-btn ${isConnected ? 'connected' : ''} ${isReconnecting ? 'reconnecting' : ''} connect-btn-content`}
           onClick={handleConnectionToggle}
           disabled={!selectedPort && !isReconnecting}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem'
-          }}
         >
           {isReconnecting && (
-            <div style={{
-              width: '12px',
-              height: '12px',
-              border: '2px solid white',
-              borderTop: '2px solid transparent',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }} />
+            <div className="loading-spinner" />
           )}
           {isReconnecting ? 'Cancel reconnection' : (isConnected ? 'Disconnect' : 'Connect')}
         </button>
       </div>
 
-      <div className="settings-group" style={{ marginTop: '1.5rem' }}>
+      <div className="settings-group settings-group-spaced">
         <label>
             Filter (Regex)
             <div className="filter-container">
@@ -140,7 +127,7 @@ export function ControlPanel() {
               )}
             </div>
         </label>
-        <label style={{ marginTop: '1rem' }}> 
+        <label className="label-spaced"> 
             Log limit (lines)
             <input
               type="number"
