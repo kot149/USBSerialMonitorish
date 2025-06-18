@@ -15,16 +15,16 @@ export function ControlPanel() {
     setFilter,
     maxLogLines,
     setMaxLogLines,
-    autoReconnect,
-    setAutoReconnect,
-    reconnectAttempts,
-    isReconnecting
+    isReconnecting,
+    cancelReconnect
   } = useSerialPort()
   
   const [selectedBaudRate, setSelectedBaudRate] = React.useState('9600')
 
   const handleConnectionToggle = () => {
-    if (isConnected) {
+    if (isReconnecting) {
+      cancelReconnect()
+    } else if (isConnected) {
       disconnect().catch(err => console.error('Disconnect error:', err))
     } else {
       connect(selectedBaudRate).catch(err => console.error('Connect error:', err))
@@ -93,11 +93,27 @@ export function ControlPanel() {
         </label>
 
         <button 
-          className={`connect-btn ${isConnected ? 'connected' : ''}`}
+          className={`connect-btn ${isConnected ? 'connected' : ''} ${isReconnecting ? 'reconnecting' : ''}`}
           onClick={handleConnectionToggle}
-          disabled={!selectedPort}
+          disabled={!selectedPort && !isReconnecting}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}
         >
-          {isConnected ? 'Disconnect' : 'Connect'}
+          {isReconnecting && (
+            <div style={{
+              width: '12px',
+              height: '12px',
+              border: '2px solid white',
+              borderTop: '2px solid transparent',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+          )}
+          {isReconnecting ? 'Cancel reconnection' : (isConnected ? 'Disconnect' : 'Connect')}
         </button>
       </div>
 
@@ -134,19 +150,9 @@ export function ControlPanel() {
             />
         </label>
         
-        <label style={{ marginTop: '1rem' }}>
-          <input
-            type="checkbox"
-            checked={autoReconnect}
-            onChange={(e) => setAutoReconnect(e.target.checked)}
-          />
-          Auto-reconnect on disconnect
-          {isReconnecting && ` (reconnecting...)`}
-          {!isReconnecting && reconnectAttempts > 0 && ` (${reconnectAttempts} attempts)`}
-        </label>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && !isReconnecting && <div className="error-message">{error}</div>}
     </div>
   )
 }
