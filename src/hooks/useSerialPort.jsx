@@ -56,12 +56,20 @@ export function SerialPortProvider({ children }) {
       return
     }
     try {
+      if (selectedPort.readable && selectedPort.readable.locked) {
+        await disconnect()
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
       await selectedPort.open({ baudRate: parseInt(selectedBaudRate) || 9600 })
       setBaudRate(selectedBaudRate)
       setIsConnected(true)
       setError(null)
       const textDecoder = new TextDecoderStream()
-      selectedPort.readable.pipeTo(textDecoder.writable)
+      selectedPort.readable.pipeTo(textDecoder.writable).catch(err => {
+        if (err !== undefined) {
+          console.warn('PipeTo error:', err)
+        }
+      })
       const reader = textDecoder.readable.getReader()
       setReader(reader)
     } catch (err) {
@@ -118,7 +126,7 @@ export function SerialPortProvider({ children }) {
         } catch (err) {
           if (!isCancelled) {
             setError("Failed to read from port.");
-            disconnect();
+            disconnect().catch(console.error);
           }
           break;
         }
@@ -140,23 +148,32 @@ export function SerialPortProvider({ children }) {
         });
       }
       if (reader) {
-        reader.cancel().catch(e => console.error("Failed to cancel reader on cleanup", e));
+        reader.cancel().catch(e => {
+          if (e !== undefined) {
+            console.error("Failed to cancel reader on cleanup", e);
+          }
+        });
       }
     };
   }, [reader, maxLogLines]); // 依存配列にmaxLogLinesを追加
 
   const disconnect = async () => {
+    setIsConnected(false);
+    
     if (reader) {
+        const currentReader = reader;
+        setReader(null);
         try {
-            await reader.cancel();
+            await currentReader.cancel();
         } catch (err) {
             console.warn('Error canceling reader:', err);
-        } finally {
-            setReader(null);
         }
     }
     
-    if (selectedPort?.readable) {
+    // 少し待ってからポートを閉じる
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    if (selectedPort) {
         try {
             await selectedPort.close();
         } catch (err) {
@@ -164,7 +181,6 @@ export function SerialPortProvider({ children }) {
         }
     }
     
-    setIsConnected(false);
     setError(null);
   }
 

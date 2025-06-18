@@ -19,15 +19,11 @@ export function ControlPanel() {
   
   const [selectedBaudRate, setSelectedBaudRate] = React.useState('9600')
 
-  const handleConnectionToggle = async () => {
-    try {
-      if (isConnected) {
-        await disconnect()
-      } else {
-        await connect(selectedBaudRate)
-      }
-    } catch (err) {
-      console.error('Connection toggle error:', err)
+  const handleConnectionToggle = () => {
+    if (isConnected) {
+      disconnect().catch(err => console.error('Disconnect error:', err))
+    } else {
+      connect(selectedBaudRate).catch(err => console.error('Connect error:', err))
     }
   }
 
