@@ -15,6 +15,8 @@ export function SerialPortProvider({ children }) {
   const [autoReconnect] = useState(true)
   const [reconnectDelay] = useState(2000)
   const [isReconnecting, setIsReconnecting] = useState(false)
+  const [reconnectTimeoutId, setReconnectTimeoutId] = useState(null)
+  const [isReconnectCancelled, setIsReconnectCancelled] = useState(false)
 
   const listPorts = async () => {
     if (!('serial' in navigator)) {
@@ -58,6 +60,9 @@ export function SerialPortProvider({ children }) {
       setError('No port selected')
       return
     }
+    
+    setIsReconnectCancelled(false);
+    
     try {
       if (selectedPort.readable && selectedPort.readable.locked) {
         await disconnect()
@@ -131,7 +136,8 @@ export function SerialPortProvider({ children }) {
             }
             setError("Connection lost. Attempting to reconnect...");
             setIsConnected(false);
-            setIsReconnecting(true); // Set immediately to prevent UI flicker
+            setIsReconnecting(true);
+            setIsReconnectCancelled(false);
             
             // Clean up current connection - ignore errors for lost devices
             try {
@@ -147,9 +153,10 @@ export function SerialPortProvider({ children }) {
               }
             }
             
-            setTimeout(() => {
+            const timeoutId = setTimeout(() => {
               attemptReconnect();
             }, reconnectDelay);
+            setReconnectTimeoutId(timeoutId);
           }
           break;
         }
@@ -182,6 +189,12 @@ export function SerialPortProvider({ children }) {
 
   const disconnect = async () => {
     setIsConnected(false);
+    setIsReconnectCancelled(true);
+    
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+      setReconnectTimeoutId(null);
+    }
     
     if (reader) {
         const currentReader = reader;
@@ -207,10 +220,11 @@ export function SerialPortProvider({ children }) {
   }
 
   const attemptReconnect = async () => {
-    if (isReconnecting) return;
+    if (isReconnecting || isReconnectCancelled) return;
     
     setIsReconnecting(true);
     setError('Reconnecting...');
+    setReconnectTimeoutId(null);
     
     try {
       // First, properly clean up existing connection
@@ -232,10 +246,12 @@ export function SerialPortProvider({ children }) {
       
       if (availablePorts.length === 0) {
         console.log('No devices available, waiting for reconnection...');
-        // Keep isReconnecting true while waiting
-        setTimeout(() => {
-          attemptReconnect();
-        }, reconnectDelay);
+        if (!isReconnectCancelled) {
+          const timeoutId = setTimeout(() => {
+            attemptReconnect();
+          }, reconnectDelay);
+          setReconnectTimeoutId(timeoutId);
+        }
         return;
       }
       
@@ -267,10 +283,12 @@ export function SerialPortProvider({ children }) {
           'original device';
         console.log(`Waiting for ${deviceDesc} to reconnect...`);
         setError(`Waiting for ${deviceDesc} to reconnect...`);
-        // Keep isReconnecting true while waiting for the specific device
-        setTimeout(() => {
-          attemptReconnect();
-        }, reconnectDelay);
+        if (!isReconnectCancelled) {
+          const timeoutId = setTimeout(() => {
+            attemptReconnect();
+          }, reconnectDelay);
+          setReconnectTimeoutId(timeoutId);
+        }
         return;
       }
       
@@ -318,20 +336,30 @@ export function SerialPortProvider({ children }) {
       setReader(newReader);
       
       setIsReconnecting(false);
+      setIsReconnectCancelled(false);
+      setReconnectTimeoutId(null);
       
     } catch (err) {
       console.error('Reconnect attempt failed:', err);
-      // Keep isReconnecting true while retrying
-      setTimeout(() => {
-        attemptReconnect();
-      }, reconnectDelay);
+      if (!isReconnectCancelled) {
+        const timeoutId = setTimeout(() => {
+          attemptReconnect();
+        }, reconnectDelay);
+        setReconnectTimeoutId(timeoutId);
+      }
     }
   };
 
   const cancelReconnect = () => {
+    setIsReconnectCancelled(true);
     setIsReconnecting(false);
+    
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+      setReconnectTimeoutId(null);
+    }
+    
     setError('Reconnection cancelled');
-    // Clear error after a brief moment
     setTimeout(() => {
       setError(null);
     }, 2000);
@@ -347,17 +375,20 @@ export function SerialPortProvider({ children }) {
     const handleConnect = (e) => {
       listPorts()
       // If we're trying to reconnect and a new device is connected, try to reconnect
-      if (!isConnected && reconnectAttempts > 0 && !isReconnecting) {
+      if (!isConnected && !isReconnecting && !isReconnectCancelled) {
         console.log('Device connected, attempting reconnect...');
-        setTimeout(() => {
+        setIsReconnectCancelled(false);
+        const timeoutId = setTimeout(() => {
           attemptReconnect();
         }, 500);
+        setReconnectTimeoutId(timeoutId);
       }
     }
     const handleDisconnect = async (e) => {
       if(selectedPort === e.port) {
         setIsConnected(false);
-        setIsReconnecting(true); // Set immediately to prevent UI flicker
+        setIsReconnecting(true);
+        setIsReconnectCancelled(false);
         
         // Clean up current connection
         try {
@@ -373,9 +404,10 @@ export function SerialPortProvider({ children }) {
           }
         }
         
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           attemptReconnect();
         }, reconnectDelay);
+        setReconnectTimeoutId(timeoutId);
       }
       listPorts()
     }
