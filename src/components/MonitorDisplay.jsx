@@ -28,16 +28,16 @@ export function MonitorDisplay() {
     }
   }, [filteredOutput]);
 
-  // ハイライト機能を追加したテキスト作成（React要素として）
+  // ハイライト機能を追加したテキスト作成
   const renderHighlightedText = (text, searchPattern) => {
     if (!searchPattern) {
       return text;
     }
-    
+
     try {
       const regex = new RegExp(`(${searchPattern})`, 'gi');
       const parts = text.split(regex);
-      
+
       return parts.map((part, index) => {
         if (regex.test(part)) {
           return <mark key={index}>{part}</mark>;
@@ -49,7 +49,7 @@ export function MonitorDisplay() {
     }
   };
 
-  // 表示するコンテンツを作成（React要素として）
+  // 表示するコンテンツを作成
   const displayContent = filteredOutput.length > 0
     ? filteredOutput.map((line, lineIndex) => (
         <span key={lineIndex}>
