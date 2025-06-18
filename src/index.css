@@ -82,6 +82,7 @@ body {
   border-radius: 8px;
   padding: 1rem;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .settings-group {
