@@ -59,6 +59,13 @@ body {
   word-break: break-word;
 }
 
+.monitor-text mark {
+  background-color: #ffff00;
+  color: #000;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
 .monitor-line {
   display: inline-block;
   white-space: pre-wrap;
