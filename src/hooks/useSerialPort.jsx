@@ -7,11 +7,19 @@ export function SerialPortProvider({ children }) {
   const [selectedPort, setSelectedPort] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState(null)
-  const [baudRate, setBaudRate] = useState(9600)
+  const [baudRate, setBaudRate] = useState(() => {
+    const saved = localStorage.getItem('serialMonitor_baudRate')
+    return saved ? parseInt(saved) : 9600
+  })
   const [reader, setReader] = useState(null)
   const [output, setOutput] = useState([])
-  const [filter, setFilter] = useState('')
-  const [maxLogLines, setMaxLogLines] = useState(1000)
+  const [filter, setFilter] = useState(() => {
+    return localStorage.getItem('serialMonitor_filter') || ''
+  })
+  const [maxLogLines, setMaxLogLines] = useState(() => {
+    const saved = localStorage.getItem('serialMonitor_maxLogLines')
+    return saved ? parseInt(saved) : 1000
+  })
 
   const listPorts = async () => {
     if (!('serial' in navigator)) {
@@ -210,6 +218,21 @@ export function SerialPortProvider({ children }) {
     }
   }, [selectedPort])
 
+  const setBaudRateWithStorage = (value) => {
+    setBaudRate(value)
+    localStorage.setItem('serialMonitor_baudRate', value)
+  }
+
+  const setFilterWithStorage = (value) => {
+    setFilter(value)
+    localStorage.setItem('serialMonitor_filter', value)
+  }
+
+  const setMaxLogLinesWithStorage = (value) => {
+    setMaxLogLines(value)
+    localStorage.setItem('serialMonitor_maxLogLines', value)
+  }
+
   const value = {
     ports,
     selectedPort,
@@ -219,13 +242,14 @@ export function SerialPortProvider({ children }) {
     connect,
     disconnect,
     baudRate,
+    setBaudRate: setBaudRateWithStorage,
     output,
     clearOutput,
     selectPort: setSelectedPort,
     filter,
-    setFilter,
+    setFilter: setFilterWithStorage,
     maxLogLines,
-    setMaxLogLines,
+    setMaxLogLines: setMaxLogLinesWithStorage,
   }
 
   return <SerialPortContext.Provider value={value}>{children}</SerialPortContext.Provider>

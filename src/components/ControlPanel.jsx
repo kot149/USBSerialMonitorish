@@ -11,19 +11,19 @@ export function ControlPanel() {
     disconnect, 
     selectPort, 
     selectedPort,
+    baudRate,
+    setBaudRate,
     filter,
     setFilter,
-    maxLogLines,      // ★追加
-    setMaxLogLines    // ★追加
+    maxLogLines,
+    setMaxLogLines
   } = useSerialPort()
-  
-  const [selectedBaudRate, setSelectedBaudRate] = React.useState('9600')
 
   const handleConnectionToggle = () => {
     if (isConnected) {
       disconnect().catch(err => console.error('Disconnect error:', err))
     } else {
-      connect(selectedBaudRate).catch(err => console.error('Connect error:', err))
+      connect(baudRate).catch(err => console.error('Connect error:', err))
     }
   }
 
@@ -73,8 +73,8 @@ export function ControlPanel() {
         <label>
           Baud Rate
           <select 
-            value={selectedBaudRate}
-            onChange={(e) => setSelectedBaudRate(e.target.value)}
+            value={baudRate}
+            onChange={(e) => setBaudRate(e.target.value)}
             disabled={isConnected}
           >
             <option value="9600">9600</option>
