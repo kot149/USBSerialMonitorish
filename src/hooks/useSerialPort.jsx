@@ -12,6 +12,10 @@ export function SerialPortProvider({ children }) {
   const [output, setOutput] = useState([])
   const [filter, setFilter] = useState('')
   const [maxLogLines, setMaxLogLines] = useState(1000)
+  const [autoReconnect, setAutoReconnect] = useState(true)
+  const [reconnectAttempts, setReconnectAttempts] = useState(0)
+  const [reconnectDelay] = useState(2000)
+  const [isReconnecting, setIsReconnecting] = useState(false)
 
   const listPorts = async () => {
     if (!('serial' in navigator)) {
@@ -66,7 +70,7 @@ export function SerialPortProvider({ children }) {
       setError(null)
       const textDecoder = new TextDecoderStream()
       selectedPort.readable.pipeTo(textDecoder.writable).catch(err => {
-        if (err !== undefined) {
+        if (err !== undefined && !err.message.includes('device has been lost')) {
           console.warn('PipeTo error:', err)
         }
       })
@@ -125,8 +129,34 @@ export function SerialPortProvider({ children }) {
 
         } catch (err) {
           if (!isCancelled) {
-            setError("Failed to read from port.");
-            disconnect().catch(console.error);
+            // Only log non-device-lost errors
+            if (!err.message.includes('device has been lost')) {
+              console.error("Read error:", err);
+            }
+            setError("Connection lost. Attempting to reconnect...");
+            setIsConnected(false);
+            
+            // Clean up current connection - ignore errors for lost devices
+            try {
+              if (reader) {
+                const currentReader = reader;
+                setReader(null);
+                await currentReader.cancel();
+              }
+            } catch (cleanupError) {
+              // Ignore cleanup errors when device is lost
+              if (!cleanupError.message.includes('device has been lost')) {
+                console.warn('Cleanup error:', cleanupError);
+              }
+            }
+            
+            if (autoReconnect && !isReconnecting) {
+              setTimeout(() => {
+                attemptReconnect();
+              }, reconnectDelay);
+            } else {
+              disconnect().catch(console.error);
+            }
           }
           break;
         }
@@ -149,7 +179,7 @@ export function SerialPortProvider({ children }) {
       }
       if (reader) {
         reader.cancel().catch(e => {
-          if (e !== undefined) {
+          if (e !== undefined && !e.message.includes('device has been lost')) {
             console.error("Failed to cancel reader on cleanup", e);
           }
         });
@@ -184,6 +214,137 @@ export function SerialPortProvider({ children }) {
     setError(null);
   }
 
+  const attemptReconnect = async () => {
+    if (!autoReconnect || isReconnecting) return;
+    
+    setIsReconnecting(true);
+    const currentAttempt = reconnectAttempts + 1;
+    setReconnectAttempts(currentAttempt);
+    setError(`Reconnecting... (${currentAttempt})`);
+    
+    try {
+      // First, properly clean up existing connection
+      if (reader) {
+        try {
+          const currentReader = reader;
+          setReader(null);
+          await currentReader.cancel();
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (cancelError) {
+          if (!cancelError.message.includes('device has been lost')) {
+            console.warn('Error canceling reader:', cancelError);
+          }
+        }
+      }
+      
+      // Refresh the ports list to get updated port objects
+      const availablePorts = await navigator.serial.getPorts();
+      
+      if (availablePorts.length === 0) {
+        console.log('No devices available, waiting for reconnection...');
+        setIsReconnecting(false);
+        if (autoReconnect) {
+          setTimeout(() => {
+            attemptReconnect();
+          }, reconnectDelay);
+        }
+        return;
+      }
+      
+      // Try to find the exact same device by vendor/product/serial ID
+      let targetPort = null;
+      let originalInfo = null;
+      
+      if (selectedPort) {
+        try {
+          originalInfo = selectedPort.getInfo();
+          targetPort = availablePorts.find(port => {
+            const info = port.getInfo();
+            // Match by vendor ID, product ID, and serial number if available
+            const vendorMatch = info.usbVendorId === originalInfo.usbVendorId;
+            const productMatch = info.usbProductId === originalInfo.usbProductId;
+            const serialMatch = !originalInfo.usbSerialNumber || 
+                               info.usbSerialNumber === originalInfo.usbSerialNumber;
+            
+            return vendorMatch && productMatch && serialMatch;
+          });
+        } catch (infoError) {
+          console.warn('Error getting original port info:', infoError);
+        }
+      }
+      
+      if (!targetPort) {
+        const deviceDesc = originalInfo ? 
+          `device (VID:${originalInfo.usbVendorId?.toString(16)}, PID:${originalInfo.usbProductId?.toString(16)})` :
+          'original device';
+        console.log(`Waiting for ${deviceDesc} to reconnect...`);
+        setError(`Waiting for ${deviceDesc} to reconnect... (${currentAttempt})`);
+        setIsReconnecting(false);
+        if (autoReconnect) {
+          setTimeout(() => {
+            attemptReconnect();
+          }, reconnectDelay);
+        }
+        return;
+      }
+      
+      // Update the selected port to the new port object
+      setSelectedPort(targetPort);
+      
+      // Check if port is already open and close it if necessary
+      try {
+        if (targetPort.readable || targetPort.writable) {
+          // Port is already open, try to close it
+          try {
+            await targetPort.close();
+            await new Promise(resolve => setTimeout(resolve, 300));
+          } catch (closeError) {
+            if (!closeError.message.includes('device has been lost') && 
+                !closeError.message.includes('Cannot cancel a locked stream')) {
+              console.warn('Error closing port during reconnect:', closeError);
+            }
+            // If we can't close it, wait a bit and try to use it as-is
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      } catch (stateError) {
+        console.warn('Error checking port state:', stateError);
+      }
+      
+      // Try to open the port
+      if (!targetPort.readable && !targetPort.writable) {
+        await targetPort.open({ baudRate: parseInt(baudRate) || 9600 });
+      } else {
+        console.log('Port is already open, reusing connection');
+      }
+      
+      setBaudRate(baudRate);
+      setIsConnected(true);
+      setError(null);
+      
+      const textDecoder = new TextDecoderStream();
+      targetPort.readable.pipeTo(textDecoder.writable).catch(err => {
+        if (err !== undefined && !err.message.includes('device has been lost')) {
+          console.warn('PipeTo error:', err);
+        }
+      });
+      const newReader = textDecoder.readable.getReader();
+      setReader(newReader);
+      
+      setReconnectAttempts(0);
+      setIsReconnecting(false);
+      
+    } catch (err) {
+      console.error(`Reconnect attempt ${currentAttempt} failed:`, err);
+      setIsReconnecting(false);
+      if (autoReconnect) {
+        setTimeout(() => {
+          attemptReconnect();
+        }, reconnectDelay);
+      }
+    }
+  };
+
   const clearOutput = () => {
     setOutput([])
   }
@@ -193,10 +354,39 @@ export function SerialPortProvider({ children }) {
     
     const handleConnect = (e) => {
       listPorts()
+      // If we're trying to reconnect and a new device is connected, try to reconnect
+      if (!isConnected && autoReconnect && reconnectAttempts > 0 && !isReconnecting) {
+        console.log('Device connected, attempting reconnect...');
+        setTimeout(() => {
+          attemptReconnect();
+        }, 500);
+      }
     }
-    const handleDisconnect = (e) => {
+    const handleDisconnect = async (e) => {
       if(selectedPort === e.port) {
-        disconnect()
+        setIsConnected(false);
+        
+        // Clean up current connection
+        try {
+          if (reader) {
+            const currentReader = reader;
+            setReader(null);
+            await currentReader.cancel();
+          }
+        } catch (cleanupError) {
+          // Ignore cleanup errors when device is lost
+          if (!cleanupError.message.includes('device has been lost')) {
+            console.warn('Cleanup error on disconnect:', cleanupError);
+          }
+        }
+        
+        if (autoReconnect && !isReconnecting) {
+          setTimeout(() => {
+            attemptReconnect();
+          }, reconnectDelay);
+        } else {
+          disconnect();
+        }
       }
       listPorts()
     }
@@ -226,6 +416,10 @@ export function SerialPortProvider({ children }) {
     setFilter,
     maxLogLines,
     setMaxLogLines,
+    autoReconnect,
+    setAutoReconnect,
+    reconnectAttempts,
+    isReconnecting,
   }
 
   return <SerialPortContext.Provider value={value}>{children}</SerialPortContext.Provider>

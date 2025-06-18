@@ -13,8 +13,12 @@ export function ControlPanel() {
     selectedPort,
     filter,
     setFilter,
-    maxLogLines,      // ★追加
-    setMaxLogLines    // ★追加
+    maxLogLines,
+    setMaxLogLines,
+    autoReconnect,
+    setAutoReconnect,
+    reconnectAttempts,
+    isReconnecting
   } = useSerialPort()
   
   const [selectedBaudRate, setSelectedBaudRate] = React.useState('9600')
@@ -120,7 +124,6 @@ export function ControlPanel() {
               )}
             </div>
         </label>
-        {/* ★ ログ行数制限の入力フィールドを追加 */}
         <label style={{ marginTop: '1rem' }}> 
             Log limit (lines)
             <input
@@ -129,6 +132,17 @@ export function ControlPanel() {
               onChange={(e) => setMaxLogLines(Number(e.target.value))}
               min="1"
             />
+        </label>
+        
+        <label style={{ marginTop: '1rem' }}>
+          <input
+            type="checkbox"
+            checked={autoReconnect}
+            onChange={(e) => setAutoReconnect(e.target.checked)}
+          />
+          Auto-reconnect on disconnect
+          {isReconnecting && ` (reconnecting...)`}
+          {!isReconnecting && reconnectAttempts > 0 && ` (${reconnectAttempts} attempts)`}
         </label>
       </div>
 
