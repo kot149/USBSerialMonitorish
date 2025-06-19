@@ -13,14 +13,18 @@ export function ControlPanel() {
     selectedPort,
     filter,
     setFilter,
-    maxLogLines,      // ★追加
-    setMaxLogLines    // ★追加
+    maxLogLines,
+    setMaxLogLines,
+    isReconnecting,
+    cancelReconnect
   } = useSerialPort()
   
   const [selectedBaudRate, setSelectedBaudRate] = React.useState('9600')
 
   const handleConnectionToggle = () => {
-    if (isConnected) {
+    if (isReconnecting) {
+      cancelReconnect()
+    } else if (isConnected) {
       disconnect().catch(err => console.error('Disconnect error:', err))
     } else {
       connect(selectedBaudRate).catch(err => console.error('Connect error:', err))
@@ -89,15 +93,18 @@ export function ControlPanel() {
         </label>
 
         <button 
-          className={`connect-btn ${isConnected ? 'connected' : ''}`}
+          className={`connect-btn ${isConnected ? 'connected' : ''} ${isReconnecting ? 'reconnecting' : ''} connect-btn-content`}
           onClick={handleConnectionToggle}
-          disabled={!selectedPort}
+          disabled={!selectedPort && !isReconnecting}
         >
-          {isConnected ? 'Disconnect' : 'Connect'}
+          {isReconnecting && (
+            <div className="loading-spinner" />
+          )}
+          {isReconnecting ? 'Cancel reconnection' : (isConnected ? 'Disconnect' : 'Connect')}
         </button>
       </div>
 
-      <div className="settings-group" style={{ marginTop: '1.5rem' }}>
+      <div className="settings-group settings-group-spaced">
         <label>
             Filter (Regex)
             <div className="filter-container">
@@ -120,8 +127,7 @@ export function ControlPanel() {
               )}
             </div>
         </label>
-        {/* ★ ログ行数制限の入力フィールドを追加 */}
-        <label style={{ marginTop: '1rem' }}> 
+        <label className="label-spaced"> 
             Log limit (lines)
             <input
               type="number"
@@ -130,9 +136,10 @@ export function ControlPanel() {
               min="1"
             />
         </label>
+        
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && !isReconnecting && <div className="error-message">{error}</div>}
     </div>
   )
 }
