@@ -1,4 +1,5 @@
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react'
+import { useLocalStorage } from './useLocalStorage'
 
 const SerialPortContext = createContext(null)
 
@@ -7,19 +8,11 @@ export function SerialPortProvider({ children }) {
   const [selectedPort, setSelectedPort] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState(null)
-  const [baudRate, setBaudRate] = useState(() => {
-    const saved = localStorage.getItem('serialMonitor_baudRate')
-    return saved ? parseInt(saved) : 9600
-  })
+  const [baudRate, setBaudRate] = useLocalStorage('serialMonitor_baudRate', 9600)
   const [reader, setReader] = useState(null)
   const [output, setOutput] = useState([])
-  const [filter, setFilter] = useState(() => {
-    return localStorage.getItem('serialMonitor_filter') || ''
-  })
-  const [maxLogLines, setMaxLogLines] = useState(() => {
-    const saved = localStorage.getItem('serialMonitor_maxLogLines')
-    return saved ? parseInt(saved) : 1000
-  })
+  const [filter, setFilter] = useLocalStorage('serialMonitor_filter', '')
+  const [maxLogLines, setMaxLogLines] = useLocalStorage('serialMonitor_maxLogLines', 1000)
   const maxLogLinesRef = useRef(maxLogLines)
   
   // Update ref when maxLogLines changes
@@ -436,20 +429,6 @@ export function SerialPortProvider({ children }) {
     }
   }, [selectedPort])
 
-  const setBaudRateWithStorage = (value) => {
-    setBaudRate(value)
-    localStorage.setItem('serialMonitor_baudRate', value)
-  }
-
-  const setFilterWithStorage = (value) => {
-    setFilter(value)
-    localStorage.setItem('serialMonitor_filter', value)
-  }
-
-  const setMaxLogLinesWithStorage = (value) => {
-    setMaxLogLines(value)
-    localStorage.setItem('serialMonitor_maxLogLines', value)
-  }
 
   const value = {
     ports,
@@ -460,14 +439,14 @@ export function SerialPortProvider({ children }) {
     connect,
     disconnect,
     baudRate,
-    setBaudRate: setBaudRateWithStorage,
+    setBaudRate,
     output,
     clearOutput,
     selectPort: setSelectedPort,
     filter,
-    setFilter: setFilterWithStorage,
+    setFilter,
     maxLogLines,
-    setMaxLogLines: setMaxLogLinesWithStorage,
+    setMaxLogLines,
     isReconnecting,
     cancelReconnect,
   }
