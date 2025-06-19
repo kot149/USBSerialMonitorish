@@ -5,18 +5,15 @@ export function MonitorDisplay() {
   const { output, clearOutput, filter } = useSerialPort();
   const monitorRef = useRef(null);
 
-  // useMemoを使用してフィルタリングされた出力を計算
   const filteredOutput = useMemo(() => {
     if (!filter) {
       return output;
     }
     try {
-      // 大文字小文字を区別しない正規表現
       const regex = new RegExp(filter, 'i');
       return output.filter(line => regex.test(line));
     } catch (e) {
       console.warn('Invalid regex:', e);
-      // 無効な正規表現の場合はフィルタリングしない
       return output;
     }
   }, [output, filter]);
@@ -28,7 +25,6 @@ export function MonitorDisplay() {
     }
   }, [filteredOutput]);
 
-  // ハイライト機能を追加したテキスト作成
   const renderHighlightedText = (text, searchPattern) => {
     if (!searchPattern) {
       return text;
@@ -49,7 +45,6 @@ export function MonitorDisplay() {
     }
   };
 
-  // 表示するコンテンツを作成
   const displayContent = filteredOutput.length > 0
     ? filteredOutput.map((line, lineIndex) => (
         <span key={lineIndex}>

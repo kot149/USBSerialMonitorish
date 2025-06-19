@@ -2,25 +2,29 @@ import React from 'react'
 import { useSerialPort } from '../hooks/useSerialPort'
 
 export function ControlPanel() {
-  const { 
-    ports, 
-    requestPort, 
-    isConnected, 
-    error, 
-    connect, 
-    disconnect, 
-    selectPort, 
+  const {
+    ports,
+    requestPort,
+    isConnected,
+    error,
+    connect,
+    disconnect,
+    selectPort,
     selectedPort,
     baudRate,
     setBaudRate,
     filter,
     setFilter,
     maxLogLines,
-    setMaxLogLines
+    setMaxLogLines,
+    isReconnecting,
+    cancelReconnect
   } = useSerialPort()
 
   const handleConnectionToggle = () => {
-    if (isConnected) {
+    if (isReconnecting) {
+      cancelReconnect()
+    } else if (isConnected) {
       disconnect().catch(err => console.error('Disconnect error:', err))
     } else {
       connect(baudRate).catch(err => console.error('Connect error:', err))
@@ -42,7 +46,7 @@ export function ControlPanel() {
           <label>
             Port
             <div className="port-select-group">
-              <select 
+              <select
                 onChange={handlePortChange}
                 value={selectedPort ? ports.indexOf(selectedPort) : -1}
                 disabled={isConnected}
@@ -59,8 +63,8 @@ export function ControlPanel() {
                   )
                 })}
               </select>
-              <button 
-                onClick={requestPort} 
+              <button
+                onClick={requestPort}
                 className="request-port-btn"
                 disabled={isConnected}
               >
@@ -72,7 +76,7 @@ export function ControlPanel() {
 
         <label>
           Baud Rate
-          <select 
+          <select
             value={baudRate}
             onChange={(e) => setBaudRate(e.target.value)}
             disabled={isConnected}
@@ -88,16 +92,19 @@ export function ControlPanel() {
           </select>
         </label>
 
-        <button 
-          className={`connect-btn ${isConnected ? 'connected' : ''}`}
+        <button
+          className={`connect-btn ${isConnected ? 'connected' : ''} ${isReconnecting ? 'reconnecting' : ''} connect-btn-content`}
           onClick={handleConnectionToggle}
-          disabled={!selectedPort}
+          disabled={!selectedPort && !isReconnecting}
         >
-          {isConnected ? 'Disconnect' : 'Connect'}
+          {isReconnecting && (
+            <div className="loading-spinner" />
+          )}
+          {isReconnecting ? 'Cancel reconnection' : (isConnected ? 'Disconnect' : 'Connect')}
         </button>
       </div>
 
-      <div className="settings-group" style={{ marginTop: '1.5rem' }}>
+      <div className="settings-group settings-group-spaced">
         <label>
             Filter (Regex)
             <div className="filter-container">
@@ -120,8 +127,7 @@ export function ControlPanel() {
               )}
             </div>
         </label>
-        {/* ★ ログ行数制限の入力フィールドを追加 */}
-        <label style={{ marginTop: '1rem' }}> 
+        <label className="label-spaced">
             Log limit (lines)
             <input
               type="number"
@@ -130,9 +136,10 @@ export function ControlPanel() {
               min="1"
             />
         </label>
+
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && !isReconnecting && <div className="error-message">{error}</div>}
     </div>
   )
 }
