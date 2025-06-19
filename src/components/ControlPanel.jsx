@@ -2,15 +2,17 @@ import React from 'react'
 import { useSerialPort } from '../hooks/useSerialPort'
 
 export function ControlPanel() {
-  const { 
-    ports, 
-    requestPort, 
-    isConnected, 
-    error, 
-    connect, 
-    disconnect, 
-    selectPort, 
+  const {
+    ports,
+    requestPort,
+    isConnected,
+    error,
+    connect,
+    disconnect,
+    selectPort,
     selectedPort,
+    baudRate,
+    setBaudRate,
     filter,
     setFilter,
     maxLogLines,
@@ -18,8 +20,6 @@ export function ControlPanel() {
     isReconnecting,
     cancelReconnect
   } = useSerialPort()
-  
-  const [selectedBaudRate, setSelectedBaudRate] = React.useState('9600')
 
   const handleConnectionToggle = () => {
     if (isReconnecting) {
@@ -27,7 +27,7 @@ export function ControlPanel() {
     } else if (isConnected) {
       disconnect().catch(err => console.error('Disconnect error:', err))
     } else {
-      connect(selectedBaudRate).catch(err => console.error('Connect error:', err))
+      connect(baudRate).catch(err => console.error('Connect error:', err))
     }
   }
 
@@ -46,7 +46,7 @@ export function ControlPanel() {
           <label>
             Port
             <div className="port-select-group">
-              <select 
+              <select
                 onChange={handlePortChange}
                 value={selectedPort ? ports.indexOf(selectedPort) : -1}
                 disabled={isConnected}
@@ -63,8 +63,8 @@ export function ControlPanel() {
                   )
                 })}
               </select>
-              <button 
-                onClick={requestPort} 
+              <button
+                onClick={requestPort}
                 className="request-port-btn"
                 disabled={isConnected}
               >
@@ -76,9 +76,9 @@ export function ControlPanel() {
 
         <label>
           Baud Rate
-          <select 
-            value={selectedBaudRate}
-            onChange={(e) => setSelectedBaudRate(e.target.value)}
+          <select
+            value={baudRate}
+            onChange={(e) => setBaudRate(e.target.value)}
             disabled={isConnected}
           >
             <option value="9600">9600</option>
@@ -92,7 +92,7 @@ export function ControlPanel() {
           </select>
         </label>
 
-        <button 
+        <button
           className={`connect-btn ${isConnected ? 'connected' : ''} ${isReconnecting ? 'reconnecting' : ''} connect-btn-content`}
           onClick={handleConnectionToggle}
           disabled={!selectedPort && !isReconnecting}
@@ -127,7 +127,7 @@ export function ControlPanel() {
               )}
             </div>
         </label>
-        <label className="label-spaced"> 
+        <label className="label-spaced">
             Log limit (lines)
             <input
               type="number"
@@ -136,7 +136,7 @@ export function ControlPanel() {
               min="1"
             />
         </label>
-        
+
       </div>
 
       {error && !isReconnecting && <div className="error-message">{error}</div>}
