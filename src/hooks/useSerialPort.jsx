@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react'
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react'
 
 const SerialPortContext = createContext(null)
 
@@ -20,6 +20,13 @@ export function SerialPortProvider({ children }) {
     const saved = localStorage.getItem('serialMonitor_maxLogLines')
     return saved ? parseInt(saved) : 1000
   })
+  const maxLogLinesRef = useRef(maxLogLines)
+  
+  // Update ref when maxLogLines changes
+  useEffect(() => {
+    maxLogLinesRef.current = maxLogLines
+  }, [maxLogLines])
+  
   const [autoReconnect] = useState(true)
   const [reconnectDelay] = useState(2000)
   const [isReconnecting, setIsReconnecting] = useState(false)
@@ -130,8 +137,8 @@ export function SerialPortProvider({ children }) {
           if (newLines.length > 0) {
             setOutput((prev) => {
               const combined = [...prev, ...newLines];
-              if (combined.length > maxLogLines) {
-                return combined.slice(combined.length - maxLogLines);
+              if (combined.length > maxLogLinesRef.current) {
+                return combined.slice(combined.length - maxLogLinesRef.current);
               }
               return combined;
             });
@@ -179,8 +186,8 @@ export function SerialPortProvider({ children }) {
         const cleanedBuffer = stripAnsi(buffer);
         setOutput((prev) => {
           const newOutput = [...prev, cleanedBuffer];
-           if (newOutput.length > maxLogLines) {
-            return newOutput.slice(newOutput.length - maxLogLines);
+           if (newOutput.length > maxLogLinesRef.current) {
+            return newOutput.slice(newOutput.length - maxLogLinesRef.current);
           }
           return newOutput;
         });
@@ -193,7 +200,7 @@ export function SerialPortProvider({ children }) {
         });
       }
     };
-  }, [reader, maxLogLines]);
+  }, [reader]);
 
   const disconnect = async () => {
     setIsConnected(false);
